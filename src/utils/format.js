@@ -1,5 +1,28 @@
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+// The headline comes from whatever named the data: the uploaded filename, or the
+// project name CamLog pushes over postMessage. ZoeLog stamps the export date into its
+// filenames ("BaywatchS1_2026_8_06.csv"), where it reads as noise on a card.
+//
+// Only a date we're certain of is stripped: three parts, one of them a four-digit year,
+// at the very end. That shape is precisely what protects real title text — a season
+// suffix ("Baywatch S1"), a sequel number ("Sicario 2") and a year that IS the title
+// ("Blade Runner 2049") all lack it and survive untouched. A lone trailing year is
+// deliberately NOT a date for this purpose, for the same reason.
+const TRAILING_DATE =
+  /[\s._/-]+(?:(?:19|20)\d{2}[\s._/-]+\d{1,2}[\s._/-]+\d{1,2}|\d{1,2}[\s._/-]+\d{1,2}[\s._/-]+(?:19|20)\d{2})$/
+
+export function toProjectTitle(name) {
+  const base = (name || '').replace(/\.csv$/i, '')
+  const stripped = base.replace(TRAILING_DATE, '')
+  // A filename that is nothing BUT a date keeps it, rather than titling the card ''.
+  return (stripped.trim() ? stripped : base)
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
 export function fmtDate(dateStr) {
   if (!dateStr) return { label: '', year: '' }
   const [y, m, d] = dateStr.split('-')

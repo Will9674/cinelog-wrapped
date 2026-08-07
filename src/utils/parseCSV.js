@@ -57,7 +57,9 @@ const SUPPORT_RULES = [
   { label: 'Steadicam',     pattern: /\bste[ae]?di(cam)?\b|\bsteady[\s-]?cam\b/i },
   // Handheld / Hand Held / Hand-Held / HH
   { label: 'Handheld',      pattern: /\bhand[\s-]?held\b|\bHH\b/i },
-  { label: 'High Hat',      pattern: /\b(?:high|hi)[\s-]?hat\b/i },
+  // "Hi-Hat" is the correct name; the pattern also accepts the common "high hat"
+  // spelling so both fold into the one category rather than splitting the count.
+  { label: 'Hi-Hat',        pattern: /\b(?:high|hi)[\s-]?hat\b/i },
   { label: 'Low Hat',       pattern: /\blow[\s-]?hat\b/i },
   // Sticks / Stick / Baby Sticks / Standard Sticks / Standards / Babies
   // Excludes slate clapper notations: No Sticks, 2nd Sticks, Mid Sticks, Tail Sticks, Head Sticks

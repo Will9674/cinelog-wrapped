@@ -3,6 +3,7 @@ import UploadScreen from './components/UploadScreen'
 import Dashboard from './components/Dashboard'
 import { parseCSV, parseCSVString, processData } from './utils/parseCSV'
 import { sampleCsv, SAMPLE_TITLE } from './utils/sampleData'
+import { toProjectTitle } from './utils/format'
 
 export default function App() {
   const [rows, setRows] = useState(null)
@@ -12,13 +13,6 @@ export default function App() {
   // Bumped on every successful load so Dashboard remounts fresh for new data,
   // giving it a correct initial date range without syncing state in an effect.
   const [loadId, setLoadId] = useState(0)
-
-  function titleFromFilename(name) {
-    return name
-      .replace(/\.csv$/i, '')
-      .replace(/[-_]+/g, ' ')
-      .toUpperCase()
-  }
 
   async function handleFile(file) {
     if (!file) return
@@ -39,7 +33,7 @@ export default function App() {
         return
       }
       setRows(processed)
-      setProjectTitle(titleFromFilename(file.name))
+      setProjectTitle(toProjectTitle(file.name))
       setLoadId((n) => n + 1)
     } catch (e) {
       setError('That file couldn’t be read as a CSV. Export a fresh log from CamLog or ZoeLog and try again.')
@@ -65,7 +59,7 @@ export default function App() {
         return
       }
       setRows(processed)
-      setProjectTitle(name ? name.replace(/[-_]+/g, ' ').toUpperCase() : '')
+      setProjectTitle(toProjectTitle(name))
       setLoadId((n) => n + 1)
     } catch (e) {
       setError('Failed to parse CSV. Please check the file format.')
