@@ -315,6 +315,57 @@ function cameraLegendText(cam) {
   return cam.model ? `${cam.name} · ${cam.model}` : `${cam.name} CAMERA`
 }
 
+// Swatch for the folded row: the dropped cameras' colours as hard-edged bands, so the
+// chip reads as "several units" and echoes the segmented bar above it.
+function foldedSwatch(colors) {
+  if (colors.length === 1) return colors[0]
+  const step = 100 / colors.length
+  const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')
+  return `linear-gradient(90deg, ${stops})`
+}
+
+// Names the folded cameras outright — a card that hides units should still say WHICH
+// units. The count leads so it survives even when the list is too long for the column
+// and the row's ellipsis clips it ("+13 MORE · M N P Q R…"): the reader always learns
+// how many are missing, and as many identities as the card can honestly show.
+function foldedLabel(rest) {
+  return `+${rest.length} MORE · ${rest.map((c) => c.name).join(' ')}`
+}
+
+// Builds the legend rows, folding any cameras past the row budget into one summary
+// row. Folding keeps the row COUNT at the budget, so the height fit is unchanged —
+// an overflow indicator appended *outside* the fitted list is what breaks this
+// layout, because nothing budgets height for it.
+function buildCameraLegend(camData, camRows) {
+  const row = (cam, i) => ({
+    key: cam.name,
+    text: cameraLegendText(cam),
+    pct: cam.pct,
+    count: cam.count,
+    swatch: getCameraColorByIndex(cam.name, i),
+  })
+
+  if (camData.length <= camRows) return camData.map(row)
+
+  // Reserve the last slot for the fold. Folding always swallows at least two cameras
+  // (we only get here when there are more than camRows of them), so the row can never
+  // read the silly "+1 MORE".
+  const head = camData.slice(0, camRows - 1)
+  const rest = camData.slice(camRows - 1)
+
+  return [
+    ...head.map(row),
+    {
+      key: '__folded__',
+      text: foldedLabel(rest),
+      pct: rest.reduce((s, c) => s + c.pct, 0),
+      count: rest.reduce((s, c) => s + c.count, 0),
+      swatch: foldedSwatch(rest.map((c, i) => getCameraColorByIndex(c.name, camRows - 1 + i))),
+      folded: true,
+    },
+  ]
+}
+
 
 // A legend row is as tall as its largest line box — the % figure's — which the
 // browser lays out at DM Mono's `normal` line-height, i.e. 1.5em. The rows are given
@@ -395,9 +446,9 @@ function CameraView({ camData, portrait, camRows }) {
 
   if (!camData.length) return <EmptyCard label="No camera data recorded" />
 
-  const shown  = camData.slice(0, camRows)
+  const legend = buildCameraLegend(camData, camRows)
 
-  const effectiveN = shown.length
+  const effectiveN = legend.length
   const { pctSz: basePctSz, rowGap } = cameraRowSizing(effectiveN, portrait, t.scale, budget)
 
   const BASE_PCT_SZ = Math.round((portrait ? 44 : 28) * t.scale)
@@ -418,9 +469,13 @@ function CameraView({ camData, portrait, camRows }) {
   // type legible; the ellipsis remains only as a backstop for absurd names.
   const CHAR   = 0.62 // DM Mono advance width ≈ 0.6em, plus a little safety
   const innerW = CARD_SIZE - (portrait ? 96 : 40) // canvas minus horizontal padding
-  const maxNameLen  = Math.max(...shown.map((c) => cameraLegendText(c).length))
-  const maxPctLen   = Math.max(...shown.map((c) => `${c.pct.toFixed(1)}%`.length))
-  const maxCountLen = Math.max(...shown.map((c) => `${c.count} ${c.count === 1 ? 'Shot' : 'Shots'}`.length))
+  // The folded row is excluded from the width fit on purpose: it is the one row whose
+  // length is unbounded (it names every hidden camera), and letting it set the type
+  // size would shrink the whole legend to accommodate a footnote. It ellipsizes
+  // instead — the only row where losing the tail costs nothing.
+  const maxNameLen  = Math.max(...legend.filter((c) => !c.folded).map((c) => c.text.length))
+  const maxPctLen   = Math.max(...legend.map((c) => `${c.pct.toFixed(1)}%`.length))
+  const maxCountLen = Math.max(...legend.map((c) => `${c.count} ${c.count === 1 ? 'Shot' : 'Shots'}`.length))
   const textNeeded  = (maxNameLen * baseNameSz + maxPctLen * basePctSz + maxCountLen * baseCountSz) * CHAR
   const textAvail   = innerW - swatchSz - 3 * rowItemGap
   const f = Math.min(1, textAvail / textNeeded)
@@ -448,16 +503,18 @@ function CameraView({ camData, portrait, camRows }) {
           ))}
         </div>
         <div ref={listRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: rowGap }}>
-          {shown.map((cam, i) => (
+          {legend.map((row) => (
             /* Explicit height + lineHeight 1: the row is exactly as tall as the fit
                math budgeted for, on any platform and whatever font resolved. */
-            <div key={cam.name} style={{ display: 'flex', alignItems: 'center', gap: rowItemGap, height: rowH, flexShrink: 0 }}>
-              <div style={{ width: swatchSz, height: swatchSz, borderRadius: 4, background: getCameraColorByIndex(cam.name, i), flexShrink: 0 }} />
-              <span style={{ fontFamily: MONO, fontSize: nameSz, lineHeight: 1, color: t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {cameraLegendText(cam)}
+            <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: rowItemGap, height: rowH, flexShrink: 0 }}>
+              <div style={{ width: swatchSz, height: swatchSz, borderRadius: 4, background: row.swatch, flexShrink: 0 }} />
+              {/* The folded row is a summary, not a camera — dimmed so it reads as a
+                  footnote to the list rather than another unit in it. */}
+              <span style={{ fontFamily: MONO, fontSize: nameSz, lineHeight: 1, color: row.folded ? t.ink2 : t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {row.text}
               </span>
-              <span style={{ fontFamily: MONO, fontSize: pctSz, lineHeight: 1, fontWeight: 600, color: t.ink }}>{cam.pct.toFixed(1)}%</span>
-              <span style={{ fontFamily: MONO, fontSize: countSz, lineHeight: 1, color: t.ink2, width: countW, textAlign: 'right' }}>{cam.count} {cam.count === 1 ? 'Shot' : 'Shots'}</span>
+              <span style={{ fontFamily: MONO, fontSize: pctSz, lineHeight: 1, fontWeight: 600, color: row.folded ? t.ink2 : t.ink }}>{row.pct.toFixed(1)}%</span>
+              <span style={{ fontFamily: MONO, fontSize: countSz, lineHeight: 1, color: t.ink2, width: countW, textAlign: 'right' }}>{row.count} {row.count === 1 ? 'Shot' : 'Shots'}</span>
             </div>
           ))}
         </div>
@@ -593,7 +650,12 @@ function WinnerRow({ label, name, pct, portrait, fitSz }) {
 // Compact camera bar + legend for the summary card.
 function CameraStrip({ camData, portrait }) {
   const t = useT()
-  const legend = camData.slice(0, portrait ? 5 : 4)
+  // Same fold as the Camera Breakdown card: the strip has always capped its chips, so
+  // spend the last slot saying how many units it stands for rather than dropping them
+  // without a trace. Chip COUNT is unchanged, so the wrap can't gain a row.
+  const cap = portrait ? 5 : 4
+  const legend = camData.length > cap ? camData.slice(0, cap - 1) : camData
+  const rest = camData.slice(legend.length)
   return (
     <div style={{ flexShrink: 0 }}>
       <div style={{ ...t.viewLabel, fontSize: portrait ? t.sc(19) : 13, letterSpacing: '0.10em', marginBottom: portrait ? t.sc(12) : 9 }}>Cameras</div>
@@ -612,6 +674,14 @@ function CameraStrip({ camData, portrait }) {
             </span>
           </div>
         ))}
+        {rest.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
+            <div style={{ width: portrait ? t.sc(13) : 10, height: portrait ? t.sc(13) : 10, borderRadius: 3, background: foldedSwatch(rest.map((c, i) => getCameraColorByIndex(c.name, legend.length + i))), flexShrink: 0 }} />
+            <span style={{ fontFamily: MONO, fontSize: portrait ? t.sc(18) : 13, color: t.ink3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              +{rest.length} more · {rest.reduce((s, c) => s + c.pct, 0).toFixed(1)}%
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )
