@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useLayoutEffect, createContext, useContext } from 'react'
+import { useMemo, useRef, useState, useCallback, useLayoutEffect, createContext, useContext } from 'react'
 import {
   lensUsage, supportUsage, cameraUsage, filterUsage,
   takesPerDay, deduplicateShots, getCameraColorByIndex,
@@ -316,7 +316,16 @@ function cameraLegendText(cam) {
 }
 
 
-function cameraRowSizing(n, portrait, scale = 1) {
+// A legend row is as tall as its largest line box — the % figure's — which the
+// browser lays out at DM Mono's `normal` line-height, i.e. 1.5em. The rows are given
+// this height EXPLICITLY (see CameraView) rather than inheriting it, so the fit math
+// below is exact rather than dependent on the font that actually loaded or on iOS's
+// slightly taller synthesized-bold metrics. 1.5 reproduces the previous line box, so
+// cards that already fit look unchanged.
+const ROW_LH = 1.5
+const rowHeightFor = (pctSz) => pctSz * ROW_LH
+
+function cameraRowSizing(n, portrait, scale = 1, budget = null) {
   // Design-confirmed baselines: full-size values that fit at threshold n.
   // Scaled down for the shorter Feed canvas (see FORMAT_GEOMETRY.scale).
   const BASE_PCT_SZ = Math.round((portrait ? 44 : 28) * scale)
@@ -325,30 +334,71 @@ function cameraRowSizing(n, portrait, scale = 1) {
   const MIN_GAP     = portrait ? 4  : 2
   const MIN_PCT_SZ  = Math.round((portrait ? 14 : 10) * scale)
 
-  if (n <= BASE_N) return { pctSz: BASE_PCT_SZ, rowGap: BASE_GAP }
+  // `budget` is the row area's measured height. Before the first measurement lands
+  // we fall back to the height BASE_N full-size rows occupy — the one figure every
+  // format is known to have room for, so a card never clips even if the measurement
+  // never arrives (it just runs a little tighter than it needs to for one frame).
+  const availH = budget ?? (BASE_N * rowHeightFor(BASE_PCT_SZ) + (BASE_N - 1) * BASE_GAP)
 
-  // Available height back-computed from the confirmed-fit baseline
-  const availH = BASE_N * BASE_PCT_SZ + (BASE_N - 1) * BASE_GAP
+  const totalFor = (pctSz, gap) => n * rowHeightFor(pctSz) + (n - 1) * gap
+
+  if (totalFor(BASE_PCT_SZ, BASE_GAP) <= availH) {
+    return { pctSz: BASE_PCT_SZ, rowGap: BASE_GAP }
+  }
 
   // Phase 1: keep pctSz, reduce gap
-  const idealGap = (availH - n * BASE_PCT_SZ) / Math.max(n - 1, 1)
+  const idealGap = (availH - n * rowHeightFor(BASE_PCT_SZ)) / Math.max(n - 1, 1)
   if (idealGap >= MIN_GAP) {
     return { pctSz: BASE_PCT_SZ, rowGap: Math.floor(idealGap) }
   }
 
   // Phase 2: gap at minimum, reduce pctSz
-  const pctSz = Math.max(MIN_PCT_SZ, Math.floor((availH - (n - 1) * MIN_GAP) / n))
+  const pctSz = Math.max(
+    MIN_PCT_SZ,
+    Math.min(BASE_PCT_SZ, Math.floor((availH - (n - 1) * MIN_GAP) / n / ROW_LH))
+  )
   return { pctSz, rowGap: MIN_GAP }
 }
 
 function CameraView({ camData, portrait, camRows }) {
   const t = useT()
+  // ── Height fit ─────────────────────────────────────────────────────────────
+  // The row area's height isn't a constant: a project title that wraps to two lines
+  // takes a title's worth of height out of it. Measuring it (rather than assuming the
+  // single-line optimum) is what keeps the last camera from being sliced in half on a
+  // full Story card. `minHeight: 0` on the measured element is load-bearing — without
+  // it the container's min-content height is its rows, so it silently grows past the
+  // clipping box instead of reporting the space it actually has.
+  const listRef = useRef(null)
+  const [budget, setBudget] = useState(null)
+  const readBudget = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    const h = el.clientHeight
+    if (h > 0) setBudget((prev) => (prev === h ? prev : h))
+  }, [])
+  // Deliberately dependency-free: the row area also changes without this component
+  // unmounting — switching format inside the share sheet, or a project title that
+  // rewraps — and a re-read on every render is what keeps those from rendering
+  // against the previous format's budget. It settles in one extra render: the box
+  // is `flex: 1, minHeight: 0`, so resizing the rows can't resize the box back.
+  useLayoutEffect(readBudget)
+  // The observer covers reflows that no render coincides with — chiefly the web font
+  // finishing loading after first paint.
+  useLayoutEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const obs = new ResizeObserver(readBudget)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [readBudget])
+
   if (!camData.length) return <EmptyCard label="No camera data recorded" />
 
   const shown  = camData.slice(0, camRows)
 
   const effectiveN = shown.length
-  const { pctSz: basePctSz, rowGap } = cameraRowSizing(effectiveN, portrait, t.scale)
+  const { pctSz: basePctSz, rowGap } = cameraRowSizing(effectiveN, portrait, t.scale, budget)
 
   const BASE_PCT_SZ = Math.round((portrait ? 44 : 28) * t.scale)
   const r = basePctSz / BASE_PCT_SZ
@@ -376,8 +426,11 @@ function CameraView({ camData, portrait, camRows }) {
   const f = Math.min(1, textAvail / textNeeded)
 
   const nameSz  = Math.max(11, Math.floor(baseNameSz * f))
-  const pctSz   = Math.max(14, Math.floor(basePctSz * f))
+  // Clamped to basePctSz: the width fit may only ever shrink the % figure, never grow
+  // it past the size the height fit approved — the row height is derived from this.
+  const pctSz   = Math.min(basePctSz, Math.max(14, Math.floor(basePctSz * f)))
   const countSz = Math.max(10, Math.floor(baseCountSz * f))
+  const rowH    = rowHeightFor(pctSz)
   // Content-sized count column (fixed width wasted space and starved the name).
   const countW  = Math.ceil(maxCountLen * countSz * CHAR)
 
@@ -394,15 +447,17 @@ function CameraView({ camData, portrait, camRows }) {
             <div key={cam.name} style={{ width: `${cam.pct}%`, background: getCameraColorByIndex(cam.name, i), minWidth: cam.pct > 0 ? 3 : 0 }} />
           ))}
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: rowGap }}>
+        <div ref={listRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: rowGap }}>
           {shown.map((cam, i) => (
-            <div key={cam.name} style={{ display: 'flex', alignItems: 'center', gap: rowItemGap }}>
+            /* Explicit height + lineHeight 1: the row is exactly as tall as the fit
+               math budgeted for, on any platform and whatever font resolved. */
+            <div key={cam.name} style={{ display: 'flex', alignItems: 'center', gap: rowItemGap, height: rowH, flexShrink: 0 }}>
               <div style={{ width: swatchSz, height: swatchSz, borderRadius: 4, background: getCameraColorByIndex(cam.name, i), flexShrink: 0 }} />
-              <span style={{ fontFamily: MONO, fontSize: nameSz, color: t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontFamily: MONO, fontSize: nameSz, lineHeight: 1, color: t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {cameraLegendText(cam)}
               </span>
-              <span style={{ fontFamily: MONO, fontSize: pctSz, fontWeight: 600, color: t.ink }}>{cam.pct.toFixed(1)}%</span>
-              <span style={{ fontFamily: MONO, fontSize: countSz, color: t.ink2, width: countW, textAlign: 'right' }}>{cam.count} {cam.count === 1 ? 'Shot' : 'Shots'}</span>
+              <span style={{ fontFamily: MONO, fontSize: pctSz, lineHeight: 1, fontWeight: 600, color: t.ink }}>{cam.pct.toFixed(1)}%</span>
+              <span style={{ fontFamily: MONO, fontSize: countSz, lineHeight: 1, color: t.ink2, width: countW, textAlign: 'right' }}>{cam.count} {cam.count === 1 ? 'Shot' : 'Shots'}</span>
             </div>
           ))}
         </div>
@@ -658,12 +713,13 @@ export function ShareCardContent({ viewId, rows, stats, projectTitle, format = '
     const lh = parseFloat(getComputedStyle(el).lineHeight) || 1
     setTitleLines(Math.max(1, Math.min(2, Math.round(el.offsetHeight / lh))))
   }, [projectTitle, format, theme])
-  // Only the scaled-down tall format (Feed) is tight enough to need this; Story has
-  // room for its full row count even with a wrapped title.
-  const rowDrop  = portrait && scale < 1 ? titleLines - 1 : 0
+  // Both tall formats need this. Story was previously exempted on the assumption that
+  // it had slack for a wrapped title; it does not — at its full 9 rows a second title
+  // line pushed the last bar ~40px past the card's clipping box.
+  const rowDrop  = portrait ? titleLines - 1 : 0
   const listRows = Math.max(3, geo.listRows - rowDrop)
-  // Camera Breakdown has a big fixed color bar, so its row budget doesn't change with
-  // the title — it's already at its clean max — hence no title-based drop here.
+  // Camera Breakdown needs no row drop: it measures its own row area and scales the
+  // rows to whatever height the title left it (see CameraView's height fit).
   const camRows  = geo.camRows
 
   const views = {

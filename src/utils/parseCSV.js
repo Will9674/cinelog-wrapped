@@ -25,28 +25,52 @@ export function parseCSVString(str) {
 
 const SUPPORT_RULES = [
   // Most specific first to avoid being shadowed by shorter terms
-  { label: 'Dana Dolly',   pattern: /\bdana[\s-]?dolly\b/i },
-  { label: 'Mini Libra',   pattern: /\bmini[\s-]?libra\b/i },
-  { label: 'Mini Scope',   pattern: /\bmini[\s-]?scope\b/i },
-  { label: 'Remote Head',  pattern: /\bremote[\s-]?head\b/i },
+  { label: 'Dana Dolly',    pattern: /\bdana[\s-]?dolly\b/i },
+  { label: 'Mini Libra',    pattern: /\bmini[\s-]?libra\b/i },
+  { label: 'Mini Scope',    pattern: /\bmini[\s-]?scope\b/i },
+  // Hydrascope (also spelled Hydroscope on plenty of logs)
+  { label: 'Hydrascope',    pattern: /\bhydr[ao][\s-]?scope\b/i },
+  // Hydroflex underwater housings. Mk6 before Mk5 so "VI" can't be read as "V", and
+  // the mark itself is optional ("Hydroflex 6"); a bare "Hydroflex" falls to the
+  // unmarked rule below rather than going unrecognized.
+  { label: 'Hydroflex Mk6', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:6|vi)\b/i },
+  { label: 'Hydroflex Mk5', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:5|v)\b/i },
+  { label: 'Hydroflex',     pattern: /\bhydro[\s-]?flex\b/i },
+  { label: '360 Head',      pattern: /\b360[\s-]?head\b/i },
+  { label: 'Remote Head',   pattern: /\bremote[\s-]?head\b/i },
+  // O'Connor — straight or curly apostrophe, or none at all; "head" is optional
+  // since the brand name alone is how it gets written on a log.
+  { label: "O'Connor Head", pattern: /\bo['’]?[\s-]?conn?or\b/i },
+  { label: 'Panahead',      pattern: /\bpana[\s-]?head\b/i },
+  { label: 'Gear Head',     pattern: /\bgear[\s-]?head\b/i },
+  // Titan / Titan Crane — before the generic Crane rule
+  { label: 'Titan Crane',   pattern: /\btitan\b/i },
   // Techno / Techno Crane / Technocrane / Techno-Crane
-  { label: 'Technocrane',  pattern: /\btechno[\s-]?(crane)?\b/i },
+  { label: 'Technocrane',   pattern: /\btechno[\s-]?(crane)?\b/i },
   // Steadicam / Steadi / Stedicam / Stedi / Steadycam / Steady Cam
-  { label: 'Steadicam',    pattern: /\bste[ae]?di(cam)?\b|\bsteady[\s-]?cam\b/i },
+  { label: 'Steadicam',     pattern: /\bste[ae]?di(cam)?\b|\bsteady[\s-]?cam\b/i },
   // Handheld / Hand Held / Hand-Held / HH
-  { label: 'Handheld',     pattern: /\bhand[\s-]?held\b|\bHH\b/i },
-  { label: 'High Hat',     pattern: /\b(?:high|hi)[\s-]?hat\b/i },
-  { label: 'Low Hat',      pattern: /\blow[\s-]?hat\b/i },
+  { label: 'Handheld',      pattern: /\bhand[\s-]?held\b|\bHH\b/i },
+  { label: 'High Hat',      pattern: /\b(?:high|hi)[\s-]?hat\b/i },
+  { label: 'Low Hat',       pattern: /\blow[\s-]?hat\b/i },
   // Sticks / Stick / Baby Sticks / Standard Sticks / Standards / Babies
   // Excludes slate clapper notations: No Sticks, 2nd Sticks, Mid Sticks, Tail Sticks, Head Sticks
-  { label: 'Sticks',       pattern: /(?:(?<!(?:no|2nd|mid|tail|head)\s)\bsticks?\b|\bbaby[\s-]+sticks?\b|\bstandard[\s-]+sticks?\b|\bstandards\b|\bbabies\b)/i },
-  { label: 'Slider',       pattern: /\bslider\b/i },
-  { label: 'Dolly',        pattern: /\bdolly\b/i },
-  { label: 'Jib',          pattern: /\bjib\b/i },
+  { label: 'Sticks',        pattern: /(?:(?<!(?:no|2nd|mid|tail|head)\s)\bsticks?\b|\bbaby[\s-]+sticks?\b|\bstandard[\s-]+sticks?\b|\bstandards\b|\bbabies\b)/i },
+  { label: 'Slider',        pattern: /\bslider\b/i },
+  { label: 'Dolly',         pattern: /\bdolly\b/i },
+  { label: 'Jib',           pattern: /\bjib\b/i },
+  // Generic crane, after Titan/Techno so a named crane keeps its name. The word
+  // boundary means "Technocrane" (unspaced) can't reach this rule anyway.
+  { label: 'Crane',         pattern: /\bcrane\b/i },
   // Ronin / Ronin-S / Ronin-M etc.
-  { label: 'Ronin',        pattern: /\bronin/i },
+  { label: 'Ronin',         pattern: /\bronin/i },
   // Gimbal / Gimble
-  { label: 'Gimbal',       pattern: /\bgimb[ae]l\b/i },
+  { label: 'Gimbal',        pattern: /\bgimb[ae]l\b/i },
+  { label: 'Drone',         pattern: /\bdrone\b/i },
+  // "Studio" is the catch-all crews write instead of spelling out dolly / sticks /
+  // gear head. It is LAST on purpose: it's a valid entry on its own, but whenever the
+  // note also names the actual rig ("studio dolly"), the specific rule should win.
+  { label: 'Studio',        pattern: /\bstudio\b/i },
 ]
 
 export function parseSupportType(notes, description = '') {
