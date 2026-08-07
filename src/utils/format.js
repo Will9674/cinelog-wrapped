@@ -12,11 +12,26 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const TRAILING_DATE =
   /[\s._/-]+(?:(?:19|20)\d{2}[\s._/-]+\d{1,2}[\s._/-]+\d{1,2}|\d{1,2}[\s._/-]+\d{1,2}[\s._/-]+(?:19|20)\d{2})$/
 
+// CamLog names its exports "<Project>_all_cameras.csv", "<Project>_custom.csv" or
+// "<Project>_Acam.csv", having replaced every character outside [A-Za-z0-9_-] in the
+// project name with an underscore — so "David Yurman" ships as
+// "David_Yurman_all_cameras.csv". Strip the export suffix and the underscores convert
+// back to spaces below, recovering the project name as typed.
+//
+// Only ONE suffix comes off, so a project genuinely called "Beach Cam" keeps its own
+// word. The per-camera form requires a 1-2 character camera id before "cam", which is
+// what stops a project ending in "_Cam" from being mistaken for one.
+const EXPORT_SUFFIX = /_(?:all_cameras|custom|[a-z0-9]{1,2}cam)$/i
+
 export function toProjectTitle(name) {
+  // Each strip is skipped when it would leave nothing behind, so a file named only
+  // "_custom.csv" or only a date still gets a headline instead of an empty one.
+  const strip = (s, re) => {
+    const out = s.replace(re, '')
+    return out.trim() ? out : s
+  }
   const base = (name || '').replace(/\.csv$/i, '')
-  const stripped = base.replace(TRAILING_DATE, '')
-  // A filename that is nothing BUT a date keeps it, rather than titling the card ''.
-  return (stripped.trim() ? stripped : base)
+  return strip(strip(base, EXPORT_SUFFIX), TRAILING_DATE)
     .replace(/[-_]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
