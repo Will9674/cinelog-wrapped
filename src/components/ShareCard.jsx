@@ -324,12 +324,12 @@ function foldedSwatch(colors) {
   return `linear-gradient(90deg, ${stops})`
 }
 
-// Names the folded cameras outright — a card that hides units should still say WHICH
-// units. The count leads so it survives even when the list is too long for the column
-// and the row's ellipsis clips it ("+13 MORE · M N P Q R…"): the reader always learns
-// how many are missing, and as many identities as the card can honestly show.
+// Just the count. Naming the folded cameras was tried and dropped: the list runs past
+// the name column on the smaller formats and ellipsizes mid-list, which looks broken
+// for identities that carry little weight this far down the order. The swatch still
+// carries their colours, and the % and shot count still account for them.
 function foldedLabel(rest) {
-  return `+${rest.length} MORE · ${rest.map((c) => c.name).join(' ')}`
+  return `+${rest.length} MORE`
 }
 
 // Builds the legend rows, folding any cameras past the row budget into one summary
@@ -361,7 +361,6 @@ function buildCameraLegend(camData, camRows) {
       pct: rest.reduce((s, c) => s + c.pct, 0),
       count: rest.reduce((s, c) => s + c.count, 0),
       swatch: foldedSwatch(rest.map((c, i) => getCameraColorByIndex(c.name, camRows - 1 + i))),
-      folded: true,
     },
   ]
 }
@@ -469,11 +468,7 @@ function CameraView({ camData, portrait, camRows }) {
   // type legible; the ellipsis remains only as a backstop for absurd names.
   const CHAR   = 0.62 // DM Mono advance width ≈ 0.6em, plus a little safety
   const innerW = CARD_SIZE - (portrait ? 96 : 40) // canvas minus horizontal padding
-  // The folded row is excluded from the width fit on purpose: it is the one row whose
-  // length is unbounded (it names every hidden camera), and letting it set the type
-  // size would shrink the whole legend to accommodate a footnote. It ellipsizes
-  // instead — the only row where losing the tail costs nothing.
-  const maxNameLen  = Math.max(...legend.filter((c) => !c.folded).map((c) => c.text.length))
+  const maxNameLen  = Math.max(...legend.map((c) => c.text.length))
   const maxPctLen   = Math.max(...legend.map((c) => `${c.pct.toFixed(1)}%`.length))
   const maxCountLen = Math.max(...legend.map((c) => `${c.count} ${c.count === 1 ? 'Shot' : 'Shots'}`.length))
   const textNeeded  = (maxNameLen * baseNameSz + maxPctLen * basePctSz + maxCountLen * baseCountSz) * CHAR
@@ -508,12 +503,10 @@ function CameraView({ camData, portrait, camRows }) {
                math budgeted for, on any platform and whatever font resolved. */
             <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: rowItemGap, height: rowH, flexShrink: 0 }}>
               <div style={{ width: swatchSz, height: swatchSz, borderRadius: 4, background: row.swatch, flexShrink: 0 }} />
-              {/* The folded row is a summary, not a camera — dimmed so it reads as a
-                  footnote to the list rather than another unit in it. */}
-              <span style={{ fontFamily: MONO, fontSize: nameSz, lineHeight: 1, color: row.folded ? t.ink2 : t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontFamily: MONO, fontSize: nameSz, lineHeight: 1, color: t.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {row.text}
               </span>
-              <span style={{ fontFamily: MONO, fontSize: pctSz, lineHeight: 1, fontWeight: 600, color: row.folded ? t.ink2 : t.ink }}>{row.pct.toFixed(1)}%</span>
+              <span style={{ fontFamily: MONO, fontSize: pctSz, lineHeight: 1, fontWeight: 600, color: t.ink }}>{row.pct.toFixed(1)}%</span>
               <span style={{ fontFamily: MONO, fontSize: countSz, lineHeight: 1, color: t.ink2, width: countW, textAlign: 'right' }}>{row.count} {row.count === 1 ? 'Shot' : 'Shots'}</span>
             </div>
           ))}
@@ -677,7 +670,7 @@ function CameraStrip({ camData, portrait }) {
         {rest.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
             <div style={{ width: portrait ? t.sc(13) : 10, height: portrait ? t.sc(13) : 10, borderRadius: 3, background: foldedSwatch(rest.map((c, i) => getCameraColorByIndex(c.name, legend.length + i))), flexShrink: 0 }} />
-            <span style={{ fontFamily: MONO, fontSize: portrait ? t.sc(18) : 13, color: t.ink3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+            <span style={{ fontFamily: MONO, fontSize: portrait ? t.sc(18) : 13, color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
               +{rest.length} more · {rest.reduce((s, c) => s + c.pct, 0).toFixed(1)}%
             </span>
           </div>
