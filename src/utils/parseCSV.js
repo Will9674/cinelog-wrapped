@@ -30,12 +30,14 @@ const SUPPORT_RULES = [
   { label: 'Mini Scope',    pattern: /\bmini[\s-]?scope\b/i },
   // Hydrascope (also spelled Hydroscope on plenty of logs)
   { label: 'Hydrascope',    pattern: /\bhydr[ao][\s-]?scope\b/i },
-  // Hydroflex underwater housings. Mk6 before Mk5 so "VI" can't be read as "V", and
-  // the mark itself is optional ("Hydroflex 6"); a bare "Hydroflex" falls to the
-  // unmarked rule below rather than going unrecognized.
-  { label: 'Hydroflex Mk6', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:6|vi)\b/i },
-  { label: 'Hydroflex Mk5', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:5|v)\b/i },
-  { label: 'Hydroflex',     pattern: /\bhydro[\s-]?flex\b/i },
+  // Hydroflex underwater housings. The brand name is usually dropped on the day — a
+  // bare "MK5 housing" or "MK6 in the tank" means the same rig — so the mark alone is
+  // enough, though then the "Mk" is required (a lone "5" would match anything).
+  // Mk6 before Mk5 so "VI" can't be read as "V". Unmarked mentions, and the water
+  // housing, fall to the plain Hydroflex rule below rather than going unrecognized.
+  { label: 'Hydroflex Mk6', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:6|vi)\b|\bm(?:ar)?k\.?\s*(?:6|vi)\b/i },
+  { label: 'Hydroflex Mk5', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:5|v)\b|\bm(?:ar)?k\.?\s*(?:5|v)\b/i },
+  { label: 'Hydroflex',     pattern: /\bhydro[\s-]?flex\b|\bwater[\s-]?housing\b/i },
   { label: '360 Head',      pattern: /\b360[\s-]?head\b/i },
   { label: 'Remote Head',   pattern: /\bremote[\s-]?head\b/i },
   // O'Connor — straight or curly apostrophe, or none at all; "head" is optional
@@ -56,9 +58,12 @@ const SUPPORT_RULES = [
   // Sticks / Stick / Baby Sticks / Standard Sticks / Standards / Babies
   // Excludes slate clapper notations: No Sticks, 2nd Sticks, Mid Sticks, Tail Sticks, Head Sticks
   { label: 'Sticks',        pattern: /(?:(?<!(?:no|2nd|mid|tail|head)\s)\bsticks?\b|\bbaby[\s-]+sticks?\b|\bstandard[\s-]+sticks?\b|\bstandards\b|\bbabies\b)/i },
+  { label: 'Rickshaw',      pattern: /\brick[\s-]?shaw\b/i },
   { label: 'Slider',        pattern: /\bslider\b/i },
   { label: 'Dolly',         pattern: /\bdolly\b/i },
-  { label: 'Jib',           pattern: /\bjib\b/i },
+  // "Job arm" is a common typo for jib arm; "arm" is required so the ordinary word
+  // "job" ("job number", "good job") can't be read as a rig.
+  { label: 'Jib',           pattern: /\bjib\b|\bjob[\s-]+arm\b/i },
   // Generic crane, after Titan/Techno so a named crane keeps its name. The word
   // boundary means "Technocrane" (unspaced) can't reach this rule anyway.
   { label: 'Crane',         pattern: /\bcrane\b/i },
