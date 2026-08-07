@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import FilterPanel from './FilterPanel'
 import PrintLayout from './PrintLayout'
 import ShareModal from './ShareModal'
@@ -9,7 +9,7 @@ import FiltersView from '../views/FiltersView'
 import CameraView from '../views/CameraView'
 import { ThemeToggleButton } from '../ThemeContext.jsx'
 import { filterRows, summaryStats, getDateRange, getCamerasInData } from '../utils/stats'
-import { fmtDate } from '../utils/format'
+import { fmtDate, safeFileStem } from '../utils/format'
 
 const VIEWS = [
   { id: 'lens', label: 'Lens Usage' },
@@ -56,7 +56,66 @@ function SidebarContents({ activeView, onNavClick, filters, onFiltersChange, dat
   )
 }
 
-export default function Dashboard({ rows, projectTitle, onReset }) {
+// The headline is derived from the export's filename, which the exporting app has
+// usually mangled — ZoeLog drops the spaces out of a project name, CamLog swaps them
+// for underscores and appends "_all_cameras". Rather than have the app guess where the
+// words were, let the user correct it. The value goes straight back to App state, so a
+// fix reaches the share cards, the PDF and the export filenames without any extra
+// plumbing. Deliberately not persisted: a re-upload re-derives the title, and a stale
+// override would be harder to explain than retyping it.
+const TITLE_SHELL =
+  "flex-1 min-w-0 text-center sm:flex-none sm:absolute sm:left-1/2 sm:-translate-x-1/2 font-['DM_Mono'] text-xl font-medium tracking-tight"
+
+function EditableTitle({ value, onChange }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!editing) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [editing])
+
+  function commit() {
+    setEditing(false)
+    const next = draft.trim()
+    if (next !== value) onChange(next)
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit() }
+          // Escape abandons the draft — the committed title is untouched.
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false) }
+        }}
+        maxLength={60}
+        aria-label="Project title"
+        className={`${TITLE_SHELL} w-full sm:w-96 bg-transparent text-(--c-ink) border-b border-(--c-accent) outline-none px-1 py-0.5`}
+      />
+    )
+  }
+
+  return (
+    <button
+      onClick={() => { setDraft(value); setEditing(true) }}
+      title="Rename this project"
+      className={`${TITLE_SHELL} line-clamp-2 cursor-text transition-colors hover:text-(--c-accent) ${
+        value ? 'text-(--c-ink)' : 'text-(--c-ink3)'
+      }`}
+    >
+      {value || 'Add a title'}
+    </button>
+  )
+}
+
+export default function Dashboard({ rows, projectTitle, onTitleChange, onReset }) {
   const [activeView, setActiveView] = useState('lens')
   // Stable identity: React re-attaches this ref to whichever tab becomes active,
   // firing the callback to scroll it into view.
@@ -137,7 +196,7 @@ export default function Dashboard({ rows, projectTitle, onReset }) {
           y += b.hPt + gap
         }
       })
-      pdf.save(`${projectTitle || 'CamLog-Wrapped'}.pdf`)
+      pdf.save(`${safeFileStem(projectTitle, 'CamLog-Wrapped')}.pdf`)
       setExported(true)
       setTimeout(() => setExported(false), 2500)
     } catch {
@@ -217,11 +276,7 @@ export default function Dashboard({ rows, projectTitle, onReset }) {
             backgroundClip: 'text',
           }}>Wrapped</span>
         </span>
-        {projectTitle && (
-          <span className="flex-1 min-w-0 text-center sm:flex-none sm:absolute sm:left-1/2 sm:-translate-x-1/2 font-['DM_Mono'] text-xl font-medium text-(--c-ink) tracking-tight line-clamp-2">
-            {projectTitle}
-          </span>
-        )}
+        <EditableTitle value={projectTitle} onChange={onTitleChange} />
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen((s) => !s)}

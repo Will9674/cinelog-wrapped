@@ -23,6 +23,21 @@ const TRAILING_DATE =
 // what stops a project ending in "_Cam" from being mistaken for one.
 const EXPORT_SUFFIX = /_(?:all_cameras|custom|[a-z0-9]{1,2}cam)$/i
 
+// The title used to come only from a filename, so it was always safe to put back into
+// one. It is user-editable now, so a typed "/" or ":" could produce a download name the
+// OS won't take — reduce it to characters every filesystem accepts.
+export function safeFileStem(title, fallback) {
+  const cleaned = (title || '')
+    // Fold accents to their base letter first, so "Café Noir" saves as "Cafe Noir"
+    // rather than losing the character entirely. The on-card title keeps the accent.
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9 _-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned || fallback
+}
+
 export function toProjectTitle(name) {
   // Each strip is skipped when it would leave nothing behind, so a file named only
   // "_custom.csv" or only a date still gets a headline instead of an empty one.

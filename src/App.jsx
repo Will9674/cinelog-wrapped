@@ -93,7 +93,7 @@ export default function App() {
   }
 
   if (rows) {
-    return <Dashboard key={loadId} rows={rows} projectTitle={projectTitle} onReset={handleReset} />
+    return <Dashboard key={loadId} rows={rows} projectTitle={projectTitle} onTitleChange={setProjectTitle} onReset={handleReset} />
   }
 
   return <UploadScreen onFile={handleFile} onDemo={loadDemo} loading={loading} error={error} />

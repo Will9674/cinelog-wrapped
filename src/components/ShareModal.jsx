@@ -3,6 +3,7 @@ import { ShareCardContent } from './ShareCard'
 import { SHARE_THEME_META, THEMES, buildCustomBase, customSignature, CUSTOM_DEFAULT } from './shareThemes'
 import { CARD_SIZE, FORMAT_GEOMETRY } from './shareCardSize'
 import CustomThemeModal from './ShareCustomTheme'
+import { safeFileStem } from '../utils/format'
 
 const CUSTOM_KEY = 'camlog-wrapped-custom-theme'
 
@@ -113,7 +114,7 @@ export default function ShareModal({ rows, stats, projectTitle, onClose }) {
   // user recolors a custom theme (the id alone would collide across palettes).
   const themeKey = isCustom ? customSignature(customConfig) : theme
   const cfgKey   = `${activeView}|${format}|${themeKey}`
-  const filename = `${projectTitle || 'CamLog-Wrapped'}-${activeView}-${format}-${theme}.png`
+  const filename = `${safeFileStem(projectTitle, 'CamLog-Wrapped')}-${activeView}-${format}-${theme}.png`
 
   // Renders the export node to a PNG File. The node is kept in-viewport (html-to-image
   // stalls indefinitely on elements positioned far off-screen) but fully transparent via
