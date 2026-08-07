@@ -23,21 +23,25 @@ export function parseCSVString(str) {
   })
 }
 
+// Ordered rules — first match wins. Three tiers, and the tier matters more than any
+// individual line:
+//
+//   1. Real camera support, most specific first so a shorter term can't shadow a
+//      longer one ("Dana Dolly" before "Dolly", "Titan" before "Crane").
+//   2. Housings. A housing is what the camera sits IN, not what holds it up, so it
+//      only names a shot when no actual rig was logged: "HH MK6 UNDERWATER" is
+//      Handheld, and a Mk5 on a Hydrascope arm is a Hydrascope.
+//   3. "Studio" — a package, not a device. Last, so any named rig wins.
+//
+// New entries go in the tier they belong to, not simply at the end.
 const SUPPORT_RULES = [
-  // Most specific first to avoid being shadowed by shorter terms
+  // ── Tier 1: camera support ────────────────────────────────────────────────
   { label: 'Dana Dolly',    pattern: /\bdana[\s-]?dolly\b/i },
   { label: 'Mini Libra',    pattern: /\bmini[\s-]?libra\b/i },
   { label: 'Mini Scope',    pattern: /\bmini[\s-]?scope\b/i },
-  // Hydrascope (also spelled Hydroscope on plenty of logs)
+  // Hydrascope (also spelled Hydroscope on plenty of logs) — a periscope arm, so it
+  // is genuine support and outranks any housing riding on it.
   { label: 'Hydrascope',    pattern: /\bhydr[ao][\s-]?scope\b/i },
-  // Hydroflex underwater housings. The brand name is usually dropped on the day — a
-  // bare "MK5 housing" or "MK6 in the tank" means the same rig — so the mark alone is
-  // enough, though then the "Mk" is required (a lone "5" would match anything).
-  // Mk6 before Mk5 so "VI" can't be read as "V". Unmarked mentions, and the water
-  // housing, fall to the plain Hydroflex rule below rather than going unrecognized.
-  { label: 'Hydroflex Mk6', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:6|vi)\b|\bm(?:ar)?k\.?\s*(?:6|vi)\b/i },
-  { label: 'Hydroflex Mk5', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:5|v)\b|\bm(?:ar)?k\.?\s*(?:5|v)\b/i },
-  { label: 'Hydroflex',     pattern: /\bhydro[\s-]?flex\b|\bwater[\s-]?housing\b/i },
   { label: '360 Head',      pattern: /\b360[\s-]?head\b/i },
   { label: 'Remote Head',   pattern: /\bremote[\s-]?head\b/i },
   // O'Connor — straight or curly apostrophe, or none at all; "head" is optional
@@ -72,6 +76,18 @@ const SUPPORT_RULES = [
   // Gimbal / Gimble
   { label: 'Gimbal',        pattern: /\bgimb[ae]l\b/i },
   { label: 'Drone',         pattern: /\bdrone\b/i },
+
+  // ── Tier 2: housings ──────────────────────────────────────────────────────
+  // Underwater housings. The brand name is usually dropped on the day — a bare
+  // "MK5 housing" or "MK6 in the tank" means the same rig — so the mark alone is
+  // enough, though then the "Mk" is required (a lone "5" would match half the log).
+  // Mk6 before Mk5 so "VI" can't be read as "V". Unmarked mentions, and the water
+  // housing, fall to the plain Hydroflex rule so they aren't lost entirely.
+  { label: 'Hydroflex Mk6', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:6|vi)\b|\bm(?:ar)?k\.?\s*(?:6|vi)\b/i },
+  { label: 'Hydroflex Mk5', pattern: /\bhydro[\s-]?flex[\s-]*(?:m(?:ar)?k)?\.?\s*(?:5|v)\b|\bm(?:ar)?k\.?\s*(?:5|v)\b/i },
+  { label: 'Hydroflex',     pattern: /\bhydro[\s-]?flex\b|\bwater[\s-]?housing\b/i },
+
+  // ── Tier 3: package labels ────────────────────────────────────────────────
   // "Studio" is the catch-all crews write instead of spelling out dolly / sticks /
   // gear head. It is LAST on purpose: it's a valid entry on its own, but whenever the
   // note also names the actual rig ("studio dolly"), the specific rule should win.
