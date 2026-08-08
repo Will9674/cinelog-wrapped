@@ -3,7 +3,7 @@ import UploadScreen from './components/UploadScreen'
 import Dashboard from './components/Dashboard'
 import { parseCSV, parseCSVString, processData } from './utils/parseCSV'
 import { sampleCsv, SAMPLE_TITLE } from './utils/sampleData'
-import { toProjectTitle } from './utils/format'
+import { toProjectTitle, titleFromFilename } from './utils/format'
 
 export default function App() {
   const [rows, setRows] = useState(null)
@@ -33,7 +33,7 @@ export default function App() {
         return
       }
       setRows(processed)
-      setProjectTitle(toProjectTitle(file.name))
+      setProjectTitle(titleFromFilename(file.name))
       setLoadId((n) => n + 1)
     } catch (e) {
       setError('That file couldn’t be read as a CSV. Export a fresh log from CamLog or ZoeLog and try again.')

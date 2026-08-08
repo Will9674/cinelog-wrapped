@@ -1,8 +1,13 @@
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-// The headline comes from whatever named the data: the uploaded filename, or the
-// project name CamLog pushes over postMessage. ZoeLog stamps the export date into its
-// filenames ("BaywatchS1_2026_8_06.csv"), where it reads as noise on a card.
+// Two ways the headline arrives, and they need different amounts of work:
+//
+//   toProjectTitle()    the CamLog deep link, which sends project.name as typed
+//   titleFromFilename() a hand-uploaded CSV, whose name the exporting app has mangled
+//
+// Only the filename has been mangled, so only it gets unpicked; both share the same
+// normalising tail. ZoeLog stamps the export date into its filenames
+// ("BaywatchS1_2026_8_06.csv"), where it reads as noise on a card.
 //
 // Only a date we're certain of is stripped: three parts, one of them a four-digit year,
 // at the very end. That shape is precisely what protects real title text — a season
@@ -38,7 +43,27 @@ export function safeFileStem(title, fallback) {
   return cleaned || fallback
 }
 
+// Shared tail: separators to spaces, collapse, uppercase. One copy, so a change to how
+// titles read can't apply to only one of the two entry points.
+function normaliseTitle(s) {
+  return s
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+// The in-app handoff: CamLog posts project.name beside the CSV (js/pages/scene-list.js),
+// so the name arrives exactly as the user typed it — no extension, no export suffix, no
+// date stamp. Normalising is all it needs. Running the filename unpicking here could
+// only invent damage: it would eat the tail of a project genuinely called "Rig_custom".
 export function toProjectTitle(name) {
+  return normaliseTitle(name || '')
+}
+
+// The manual-upload fallback: this name has been through the exporting app's naming
+// scheme (see EXPORT_SUFFIX and TRAILING_DATE above), so unpick that before normalising.
+export function titleFromFilename(name) {
   // Each strip is skipped when it would leave nothing behind, so a file named only
   // "_custom.csv" or only a date still gets a headline instead of an empty one.
   const strip = (s, re) => {
@@ -46,11 +71,7 @@ export function toProjectTitle(name) {
     return out.trim() ? out : s
   }
   const base = (name || '').replace(/\.csv$/i, '')
-  return strip(strip(base, EXPORT_SUFFIX), TRAILING_DATE)
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase()
+  return normaliseTitle(strip(strip(base, EXPORT_SUFFIX), TRAILING_DATE))
 }
 
 export function fmtDate(dateStr) {
