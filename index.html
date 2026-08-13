@@ -6,6 +6,29 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Your production, wrapped. Drop a CamLog CSV export to see production statistics." />
+
+    <!-- Link preview card. iMessage, Slack and the rest pick the big banner only
+         when a 1200x630 og:image is declared WITH its dimensions and the Twitter
+         card type — a bare og:image degrades to the small thumbnail. Same shape as
+         app.camlog.app (icons/og-invite.png) and camlog.app (og.png). ?v busts the
+         preview caches, which hold the old card for days; bump it when og.png
+         changes. Absolute URLs are required — previewers don't resolve relatives. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CamLog Wrapped" />
+    <meta property="og:title" content="CamLog Wrapped" />
+    <meta property="og:description" content="Your production, wrapped. Drop a CamLog or ZoeLog CSV export to see your production in numbers." />
+    <meta property="og:url" content="https://wrapped.camlog.app/" />
+    <meta property="og:image" content="https://wrapped.camlog.app/og.png?v=1" />
+    <meta property="og:image:secure_url" content="https://wrapped.camlog.app/og.png?v=1" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="CamLog Wrapped — your production, wrapped." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CamLog Wrapped" />
+    <meta name="twitter:description" content="Your production, wrapped. Drop a CamLog or ZoeLog CSV export to see your production in numbers." />
+    <meta name="twitter:image" content="https://wrapped.camlog.app/og.png?v=1" />
+
     <title>CamLog Wrapped</title>
   </head>
   <body>
